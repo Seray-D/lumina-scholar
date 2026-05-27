@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumina Scholar v2 - Advanced AI Study Platform</title>
+    
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Lumina Scholar" />
+    <meta name="theme-color" content="#090d16" />
+    
+    <link rel="icon" type="image/png" href="icon.png" />
+    
+    <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22Lumina%20Scholar%22%2C%22short_name%22%3A%22Lumina%20Scholar%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f0f1a%22%2C%22theme_color%22%3A%22%236366f1%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22icon.png%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fpng%22%7D%2C%7B%22src%22%3A%22icon.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+                        space: { 900: '#0f172a', 950: '#090d16', 800: '#1e293b', 700: '#334155' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+        .glass-panel { background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .flashcard { perspective: 1000px; }
+        .flashcard-inner { transition: transform 0.4s; transform-style: preserve-3d; }
+        .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+    </style>
+</head>
+<body class="flex flex-col h-full font-sans antialiased selection:bg-brand-500/30 overflow-hidden">
+
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <header class="flex items-center justify-between px-4 py-3 border-b border-slate-900 glass-panel sticky top-0 z-40 shrink-0">
+        <div class="flex items-center space-x-2">
+            <div class="p-2 rounded-xl bg-brand-500/10 text-brand-500 border border-brand-500/20 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
+                <i data-lucide="binary" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">Lumina Scholar <span class="text-[10px] px-1.5 py-0.5 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 rounded-md font-mono">v2.0</span></h1>
+                <p class="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Advanced Academic Intelligence Sandbox</p>
+            </div>
+        </div>
+        
+        <div class="flex md:hidden bg-space-900 border border-slate-800 p-1 rounded-xl" id="mobile-tab-controls">
+            <button onclick="switchMobileTab('workspace')" id="tab-btn-workspace" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-500 text-white transition">Workspace</button>
+            <button onclick="switchMobileTab('notebook')" id="tab-btn-notebook" class="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-400 transition">Notebook</button>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button onclick="toggleModal('settings-modal', true)" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-space-900 border border-transparent hover:border-slate-800 transition" title="System Token Configurations">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden relative">
+        
+        <section id="pane-workspace" class="w-full md:w-7/12 flex flex-col border-r border-slate-900 overflow-hidden shrink-0 md:shrink">
+            
+            <div class="p-3 bg-space-950 border-b border-slate-900 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center space-x-2 w-full sm:w-auto">
+                    <select id="course-selector" onchange="switchCourseContext()" class="bg-space-900 border border-slate-800 rounded-xl text-xs font-medium px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 max-w-[180px] truncate"></select>
+                    <button onclick="createNewCoursePrompt()" class="p-2 bg-space-900 border border-slate-800 hover:border-slate-700 text-brand-500 hover:text-brand-400 rounded-xl transition" title="Provision New Target Course Context Folder"><i data-lucide="folder-plus" class="w-4 h-4"></i></button>
+                </div>
+                
+                <div class="flex items-center space-x-1.5 ml-auto sm:ml-0">
+                    <button onclick="triggerQuizGeneration()" id="btn-wizard-quiz" disabled class="px-2.5 py-1.5 disabled:opacity-40 disabled:pointer-events-none bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 text-[11px] font-semibold rounded-lg transition flex items-center gap-1"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Quiz Wizard</button>
+                    <button onclick="triggerFlashcardGeneration()" id="btn-wizard-cards" disabled class="px-2.5 py-1.5 disabled:opacity-40 disabled:pointer-events-none bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/20 text-[11px] font-semibold rounded-lg transition flex items-center gap-1"><i data-lucide="layers" class="w-3.5 h-3.5"></i> Cards Wizard</button>
+                </div>
+            </div>
+
+            <div class="px-4 py-2 bg-space-900/40 border-b border-slate-900/60 flex items-center justify-between text-[11px] text-slate-400 overflow-x-auto whitespace-nowrap">
+                <div class="flex items-center space-x-2 truncate">
+                    <i data-lucide="database" class="w-3.5 h-3.5 text-slate-500 shrink-0"></i>
+                    <span class="font-medium text-slate-300">Pooled Context Vectors:</span>
+                    <span id="pool-document-count" class="text-slate-400">0 documents loaded</span>
+                    <span class="text-slate-600">|</span>
+                    <span id="pool-character-count" class="font-mono text-slate-500">0 chars context</span>
+                </div>
+                <div class="flex items-center space-x-3 pl-3 shrink-0">
+                    <input type="file" id="pdf-pool-uploader" accept=".pdf" class="hidden" onchange="handlePoolFileUploader(event)" multiple>
+                    <label for="pdf-pool-uploader" class="text-brand-500 hover:text-brand-400 font-semibold cursor-pointer flex items-center gap-1"><i data-lucide="paperclip" class="w-3 h-3"></i> Add PDF (Max 50MB)</label>
+                    <button onclick="wipeCurrentCourseContextPool()" class="text-rose-500 hover:text-rose-400 font-semibold flex items-center gap-1" title="Purge Pool"><i data-lucide="eraser" class="w-3 h-3"></i> Flush Pool</button>
+                </div>
+            </div>
+
+            <div id="chat-scroller-stream" class="flex-1 overflow-y-auto p-4 space-y-4 bg-space-950/20 relative">
+                <div id="chat-empty-state-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 pointer-events-none">
+                    <div class="w-11 h-11 rounded-2xl bg-space-900 border border-slate-800 flex items-center justify-center text-slate-500 shadow-inner"><i data-lucide="message-square-dashed" class="w-5 h-5"></i></div>
+                    <div class="max-w-xs space-y-1">
+                        <p class="text-xs font-semibold text-slate-300">Workspace Execution Flow Ready</p>
+                        <p class="text-[11px] text-slate-500 leading-relaxed">Map your access keys, create or configure an isolated academic folder context block, attach target materials, and formulate an inquiry stream.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="runtime-wizard-interactive-zone" class="hidden px-4 py-3 bg-space-900 border-t border-slate-900 max-h-[320px] overflow-y-auto"></div>
+
+            <div id="stream-typing-wait-indicator" class="hidden px-4 py-2 border-t border-slate-900 bg-space-900/30 text-[11px] text-slate-400 flex items-center gap-2">
+                <div class="flex space-x-1 shrink-0">
+                    <div class="w-1.5 h-1.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                    <div class="w-1.5 h-1.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                    <div class="w-1.5 h-1.5 bg-brand-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                </div>
+                <span id="wait-indicator-text">Lumina Scholar synthesizing contextual graphs via Gemini Flash...</span>
+            </div>
+
+            <div class="p-3 border-t border-slate-900 bg-space-950/80 backdrop-blur-md">
+                <form id="workspace-query-form" onsubmit="handleQueryFormSubmission(event)" class="flex gap-2 max-w-4xl mx-auto relative">
+                    <input type="text" id="workspace-user-input" disabled autocomplete="off" placeholder="Upload course materials to initialize active pipeline layers..." class="w-full bg-space-900 text-xs border border-slate-800 rounded-xl pl-4 pr-12 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                    <button type="submit" id="workspace-submit-btn" disabled class="absolute right-1.5 top-1.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-0 disabled:pointer-events-none text-white rounded-lg p-2 transition flex items-center justify-center shrink-0">
+                        <i data-lucide="corner-down-left" class="w-3.5 h-3.5"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <section id="pane-notebook" class="hidden md:flex w-full md:w-5/12 flex-col bg-space-900/30 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-900 bg-space-950/50 flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2">
+                    <div class="p-1.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20"><i data-lucide="book-open-check" class="w-4 h-4"></i></div>
+                    <span class="text-xs font-bold text-slate-200">Study Course Notes & Summary Draft Deck</span>
+                </div>
+                <button onclick="exportMarkdownNotebookNotes()" class="px-3 py-1.5 bg-space-900 hover:bg-space-800 text-slate-300 hover:text-white border border-slate-800 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"><i data-lucide="download-cloud" class="w-3.5 h-3.5"></i> Export Summary Data</button>
+            </div>
+            
+            <div class="flex-1 p-4 flex flex-col space-y-3 h-full overflow-hidden">
+                <textarea id="markdown-notepad-textarea" placeholder="# Active Learning Course Syllabus Notes&#10;&#10;Use the 'Add to Notes' action cards directly inside chat response bubbles to capture summaries, definitions, equations, or quiz feedback loops instantly into this scratchpad repository matrix..." class="w-full flex-1 bg-space-950/40 text-slate-300 placeholder-slate-600 font-mono text-xs border border-slate-800/80 rounded-xl p-4 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 resize-none leading-relaxed"></textarea>
+            </div>
+        </section>
+    </main>
+
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]">
+        <div class="bg-space-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4 text-brand-500"></i> Local API Token Environment Configuration</h3>
+                <button onclick="toggleModal('settings-modal', false)" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="space-y-2">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Google Gemini API Authentication Token Structure</label>
+                <div class="relative">
+                    <input type="password" id="api-key-input-field" placeholder="AIzaSy..." class="w-full bg-space-950 border border-slate-800 rounded-xl pl-4 pr-10 py-2.5 text-xs font-mono text-slate-200 placeholder-slate-700 focus:outline-none focus:border-brand-500 transition">
+                    <button type="button" onclick="toggleTokenVisibilityField()" class="absolute right-3 top-3 text-slate-500 hover:text-slate-300"><i data-lucide="eye" id="toggle-key-visibility-icon" class="w-4 h-4"></i></button>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-relaxed">The processing sequence requires an operational validation token. Keys persist locally inside sandboxed storage structures within the local runtime scope.</p>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="saveApiKeyToEnvironment()" class="w-full px-4 py-2.5 bg-brand-500 hover:bg-brand-600 font-semibold text-xs text-white rounded-xl transition">Apply Environment Configurations</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        
+        const ACADEMIC_SYSTEM_PROMPT = `You are "Lumina Scholar v2," an elite academic assistant designed to run content vector validation over structured text aggregations. 
+Your core objective is to analyze technical data frames, mathematical notations, code schemas, or structured reading segments from the uploaded course documentation context provided by the user.
+
+CRITICAL INSTRUCTIONS:
+1. Formulate responses based strictly and meticulously on the provided documentation context text parameters. 
+2. If the user's inquiry requires analysis of specific tables, coordinate data, or charts embedded in the text stream, parse the structure meticulously and map it out cleanly for the user.
+3. If an answer cannot be deduced logically from the available contextual pool, explicitly inform the user that you lack the specific reference framework. Refuse to create outside fabrications or hallucinate details.
+4. Keep all responses structurally organized, concise, professional, and entirely in the English language.`;
+
+        let state = {
+            db: null,
+            courses: [],
+            currentCourseId: null,
+            apiKey: "",
+            activeMobileTab: 'workspace'
+        };
+
+        const DB_NAME = "LuminaScholarV2DB";
+        const DB_VERSION = 1;
+
+        function initializeIndexedDBEngine() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains("courses")) {
+                        db.createObjectStore("courses", { keyPath: "id" });
+                    }
+                    if (!db.objectStoreNames.contains("documents")) {
+                        db.createObjectStore("documents", { keyPath: "id" });
+                    }
+                    if (!db.objectStoreNames.contains("chats")) {
+                        db.createObjectStore("chats", { keyPath: "id" });
+                    }
+                };
+
+                request.onsuccess = (e) => {
+                    state.db = e.target.result;
+                    resolve(state.db);
+                };
+
+                request.onerror = (e) => {
+                    createToastAlert("Database system failure initialization.", "error");
+                    reject(e.target.error);
+                };
+            });
+        }
+
+        function writeDataToStore(storeName, data) {
+            return new Promise((resolve, reject) => {
+                const tx = state.db.transaction(storeName, "readwrite");
+                const store = tx.objectStore(storeName);
+                const req = store.put(data);
+                req.onsuccess = () => resolve(true);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function readDataFromStore(storeName, key) {
+            return new Promise((resolve, reject) => {
+                const tx = state.db.transaction(storeName, "readonly");
+                const store = tx.objectStore(storeName);
+                const req = store.get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function deleteDataFromStore(storeName, key) {
+            return new Promise((resolve, reject) => {
+                const tx = state.db.transaction(storeName, "readwrite");
+                const store = tx.objectStore(storeName);
+                const req = store.delete(key);
+                req.onsuccess = () => resolve(true);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function getAllRecordsFromStore(storeName) {
+            return new Promise((resolve, reject) => {
+                const tx = state.db.transaction(storeName, "readonly");
+                const store = tx.objectStore(storeName);
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function createToastAlert(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `p-3 text-xs font-medium rounded-xl border shadow-lg flex items-center justify-between gap-3 pointer-events-auto animate-[slideIn_0.2s_ease-out]`;
+            
+            if(type === 'error') {
+                toast.className += " bg-rose-500/10 border-rose-500/20 text-rose-400";
+            } else if(type === 'success') {
+                toast.className += " bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
+            } else {
+                toast.className += " bg-blue-500/10 border-blue-500/20 text-blue-400";
+            }
+
+            toast.innerHTML = `<span>${message}</span><button class="opacity-60 hover:opacity-100" onclick="this.parentElement.remove()"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>`;
+            container.appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => { if(toast.parentElement) toast.remove(); }, 4000);
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            try {
+                await initializeIndexedDBEngine();
+                loadEnvCredentialsToken();
+                await synchronizePlatformCourseState();
+            } catch (err) {
+                console.error("Critical failure during platform configuration bootstrap: ", err);
+            }
+        });
+
+        function loadEnvCredentialsToken() {
+            const preservedKey = localStorage.getItem('LUMINA_GEMINI_V2_KEY');
+            if(preservedKey) {
+                state.apiKey = preservedKey;
+                document.getElementById('api-key-input-field').value = preservedKey;
+            } else {
+                toggleModal('settings-modal', true);
+            }
+        }
+
+        function saveApiKeyToEnvironment() {
+            const value = document.getElementById('api-key-input-field').value.trim();
+            if(!value) {
+                createToastAlert("Invalid input validation criteria provided.", "error");
+                return;
+            }
+            localStorage.setItem('LUMINA_GEMINI_V2_KEY', value);
+            state.apiKey = value;
+            toggleModal('settings-modal', false);
+            createToastAlert("API access tokens accepted successfully.", "success");
+            evaluateInteractiveInputsState();
+        }
+
+        function toggleModal(id, visible) {
+            const modal = document.getElementById(id);
+            if(visible) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        function toggleTokenVisibilityField() {
+            const input = document.getElementById('api-key-input-field');
+            const icon = document.getElementById('toggle-key-visibility-icon');
+            if(input.type === "password") {
+                input.type = "text";
+                icon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                input.type = "password";
+                icon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
+        async function synchronizePlatformCourseState() {
+            const records = await getAllRecordsFromStore("courses");
+            const selector = document.getElementById('course-selector');
+            selector.innerHTML = "";
+            
+            if(records.length === 0) {
+                const initialCourse = { id: "course_" + Date.now(), title: "General Engineering Physics", metadata: { author: "", year: "" } };
+                await writeDataToStore("courses", initialCourse);
+                records.push(initialCourse);
+            }
+            
+            state.courses = records;
+            records.forEach(course => {
+                const opt = document.createElement('option');
+                opt.value = course.id;
+                opt.textContent = course.title;
+                selector.appendChild(opt);
+            });
+
+            if(!state.currentCourseId || !records.find(c => c.id === state.currentCourseId)) {
+                state.currentCourseId = records[0].id;
+            }
+            selector.value = state.currentCourseId;
+            
+            await reloadActiveCourseWorkspacePool();
+        }
+
+        async function createNewCoursePrompt() {
+            const title = prompt("Enter Name Title Parameter for New Course Workspace:");
+            if(!title || !title.trim()) return;
+            
+            const newCourse = {
+                id: "course_" + Date.now(),
+                title: title.trim(),
+                metadata: { author: "Academic Source", year: "2026" }
+            };
+            
+            await writeDataToStore("courses", newCourse);
+            createToastAlert(`Workspace folder '${title}' established.`, "success");
+            state.currentCourseId = newCourse.id;
+            await synchronizePlatformCourseState();
+        }
+
+        async function switchCourseContext() {
+            state.currentCourseId = document.getElementById('course-selector').value;
+            await reloadActiveCourseWorkspacePool();
+        }
+
+        async function reloadActiveCourseWorkspacePool() {
+            const documents = await getAllRecordsFromStore("documents");
+            const activePoolDocs = documents.filter(doc => doc.courseId === state.currentCourseId);
+            
+            let totalChars = 0;
+            activePoolDocs.forEach(d => totalChars += d.textPayload.length);
+            
+            document.getElementById('pool-document-count').textContent = `${activePoolDocs.length} material(s) linked`;
+            document.getElementById('pool-character-count').textContent = `${totalChars.toLocaleString()} chars context`;
+
+            const chats = await getAllRecordsFromStore("chats");
+            const activeChatRecord = chats.find(c => c.id === state.currentCourseId);
+            
+            const streamContainer = document.getElementById('chat-scroller-stream');
+            streamContainer.innerHTML = "";
+            
+            if(activeChatRecord && activeChatRecord.history && activeChatRecord.history.length > 0) {
+                activeChatRecord.history.forEach(msg => {
+                    if(msg.parts && msg.parts[0] && msg.parts[0].text) {
+                        appendChatBubbleUI(msg.role === 'user' ? 'user' : 'scholar', msg.parts[0].text, false);
+                    }
+                });
+            } else {
+                streamContainer.innerHTML = `
+                <div id="chat-empty-state-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 pointer-events-none">
+                    <div class="w-11 h-11 rounded-2xl bg-space-900 border border-slate-800 flex items-center justify-center text-slate-500 shadow-inner"><i data-lucide="message-square-dashed" class="w-5 h-5"></i></div>
+                    <div class="max-w-xs space-y-1">
+                        <p class="text-xs font-semibold text-slate-300">Workspace Execution Flow Ready</p>
+                        <p class="text-[11px] text-slate-500 leading-relaxed">Map your access keys, create or configure an isolated academic folder context block, attach target materials, and formulate an inquiry stream.</p>
+                    </div>
+                </div>`;
+                lucide.createIcons();
+            }
+
+            evaluateInteractiveInputsState();
+            hideWizardInteractiveConsole();
+        }
+
+        async function handlePoolFileUploader(event) {
+            const files = event.target.files;
+            if(!files || files.length === 0) return;
+
+            const toggleIndicatorState = (show, text = "") => {
+                const indicator = document.getElementById('stream-typing-wait-indicator');
+                const label = document.getElementById('wait-indicator-text');
+                if(show) {
+                    label.textContent = text;
+                    indicator.classList.remove('hidden');
+                } else {
+                    indicator.classList.add('hidden');
+                }
+            };
+
+            for(let i=0; i<files.length; i++) {
+                const file = files[i];
+                if(file.size > 50 * 1024 * 1024) {
+                    createToastAlert(`Skipping '${file.name}': Exceeds structural limit cap boundary constraints (50MB)`, "error");
+                    continue;
+                }
+
+                toggleIndicatorState(true, `Parsing text matrix variables from '${file.name}'...`);
+                
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                    const pdf = await loadingTask.promise;
+                    
+                    let extractedText = "";
+                    let totalPages = pdf.numPages;
+                    let sampleTitle = file.name;
+                    
+                    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                        const page = await pdf.getPage(pageNum);
+                        const content = await page.getTextContent();
+                        const pageText = content.items.map(item => item.str).join(" ");
+                        extractedText += pageText + "\n";
+                    }
+
+                    const documentPayloadRecord = {
+                        id: "doc_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+                        courseId: state.currentCourseId,
+                        fileName: file.name,
+                        fileSize: file.size,
+                        extractedPagesCount: totalPages,
+                        textPayload: extractedText,
+                        metadata: {
+                            title: sampleTitle.replace(".pdf", ""),
+                            author: "Document Source Reference",
+                            year: "2026"
+                        }
+                    };
+
+                    await writeDataToStore("documents", documentPayloadRecord);
+                    createToastAlert(`Successfully indexed text matrix for: ${file.name}`, "success");
+
+                } catch (err) {
+                    console.error(err);
+                    createToastAlert(`Parsing pipeline failed for document structure: ${file.name}`, "error");
+                }
+            }
+
+            toggleIndicatorState(false);
+            event.target.value = "";
+            await reloadActiveCourseWorkspacePool();
+        }
+
+        async function wipeCurrentCourseContextPool() {
+            if(!confirm("Are you sure you want to completely flush all loaded PDF context files and chat arrays inside this course?")) return;
+            
+            const documents = await getAllRecordsFromStore("documents");
+            for(const doc of documents) {
+                if(doc.courseId === state.currentCourseId) {
+                    await deleteDataFromStore("documents", doc.id);
+                }
+            }
+
+            await deleteDataFromStore("chats", state.currentCourseId);
+            createToastAlert("Target operational context records wiped successfully.", "success");
+            await reloadActiveCourseWorkspacePool();
+        }
+
+        async function getMergedCourseContextString() {
+            const allDocs = await getAllRecordsFromStore("documents");
+            const activePoolDocs = allDocs.filter(doc => doc.courseId === state.currentCourseId);
+            return activePoolDocs.map(d => `[DOCUMENT FILE NAME DECK: ${d.fileName}]\n${d.textPayload}`).join("\n\n---\n\n");
+        }
+
+        async function getActiveCourseDocsArray() {
+            const allDocs = await getAllRecordsFromStore("documents");
+            return allDocs.filter(doc => doc.courseId === state.currentCourseId);
+        }
+
+        function evaluateInteractiveInputsState() {
+            const input = document.getElementById('workspace-user-input');
+            const submitBtn = document.getElementById('workspace-submit-btn');
+            const qBtn = document.getElementById('btn-wizard-quiz');
+            const cBtn = document.getElementById('btn-wizard-cards');
+
+            const checkActiveContextDocsCount = async () => {
+                const docs = await getActiveCourseDocsArray();
+                if(docs.length > 0 && state.apiKey) {
+                    input.removeAttribute('disabled');
+                    submitBtn.removeAttribute('disabled');
+                    qBtn.removeAttribute('disabled');
+                    cBtn.removeAttribute('disabled');
+                    input.placeholder = "Formulate inquiry regarding current contextual reference parameters...";
+                } else {
+                    input.setAttribute('disabled', 'true');
+                    submitBtn.setAttribute('disabled', 'true');
+                    qBtn.setAttribute('disabled', 'true');
+                    cBtn.setAttribute('disabled', 'true');
+                    
+                    if(!state.apiKey) {
+                        input.placeholder = "Provide a valid Google Gemini token credential profile to continue...";
+                    } else {
+                        input.placeholder = "Attach core structural PDF source files to build context mappings...";
+                    }
+                }
+            };
+            checkActiveContextDocsCount();
+        }
+
+        function appendChatBubbleUI(role, text, autoScroll = true) {
+            const placeholder = document.getElementById('chat-empty-state-placeholder');
+            if(placeholder) placeholder.remove();
+
+            const stream = document.getElementById('chat-scroller-stream');
+            const bubbleWrapper = document.createElement('div');
+            bubbleWrapper.className = `flex w-full ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4 animate-[fadeIn_0.1s_ease-out]`;
+
+            let innerHtmlBlock = "";
+            const escapedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            
+            if(role === 'user') {
+                innerHtmlBlock = `
+                    <div class="bg-brand-500 text-white rounded-2xl rounded-tr-none px-4 py-2.5 max-w-[85%] text-xs font-medium shadow-md">
+                        ${escapedText.replace(/\n/g, "<br>")}
+                    </div>`;
+            } else {
+                const uniqueElementId = "bubble_node_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                innerHtmlBlock = `
+                    <div class="bg-space-900 border border-slate-800/80 text-slate-200 rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] text-xs shadow-sm space-y-3">
+                        <div class="prose prose-invert text-slate-200 font-normal leading-relaxed text-xs break-words whitespace-pre-wrap" id="${uniqueElementId}">${escapedText}</div>
+                        
+                        <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/60 text-[10px] text-slate-400">
+                            <button onclick="appendSnippetTextToNotebook('${uniqueElementId}')" class="hover:text-brand-400 font-medium flex items-center gap-1 transition"><i data-lucide="plus-circle" class="w-3 h-3"></i> Add to Notes</button>
+                            <span class="text-slate-700">|</span>
+                            <button onclick="revealCitationSelectorMenu('${uniqueElementId}')" class="hover:text-violet-400 font-medium flex items-center gap-1 transition"><i data-lucide="bookmark" class="w-3 h-3"></i> Cite Block</button>
+                            <span class="text-slate-700">|</span>
+                            <button onclick="copyRawTextSnippetToClipboard('${uniqueElementId}')" class="hover:text-slate-200 font-medium flex items-center gap-1 transition"><i data-lucide="clipboard" class="w-3 h-3"></i> Copy</button>
+                        </div>
+                        <div id="citation-mount-frame-${uniqueElementId}" class="hidden p-2 bg-space-950 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-400 space-y-1"></div>
+                    </div>`;
+            }
+
+            bubbleWrapper.innerHTML = innerHtmlBlock;
+            stream.appendChild(bubbleWrapper);
+            lucide.createIcons();
+            
+            if(autoScroll) {
+                stream.scrollTop = stream.scrollHeight;
+            }
+        }
+
+        function appendSnippetTextToNotebook(elementId) {
+            const element = document.getElementById(elementId);
+            if(!element) return;
+            
+            const rawText = element.textContent || element.innerText;
+            const notepad = document.getElementById('markdown-notepad-textarea');
+            
+            notepad.value += `\n\n### Appended AI Study Concept Capture\n> ${rawText.trim().replace(/\n/g, "\n> ")}\n`;
+            createToastAlert("Block content indexed into active Notepad layer.", "success");
+            
+            if(window.innerWidth < 768) {
+                switchMobileTab('notebook');
+            }
+        }
+
+        function copyRawTextSnippetToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            if(!element) return;
+            const textToCopy = element.textContent || element.innerText;
+            navigator.clipboard.writeText(textToCopy);
+            createToastAlert("Copied to clipboard matrix sandbox memory pool.", "info");
+        }
+
+        function exportMarkdownNotebookNotes() {
+            const dataText = document.getElementById('markdown-notepad-textarea').value;
+            const blob = new Blob([dataText], { type: 'text/markdown;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `Lumina_Scholar_Notes_${state.currentCourseId}.md`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+            createToastAlert("Markdown data transfer file download execution initiated.", "success");
+        }
+
+        async function revealCitationSelectorMenu(elementId) {
+            const targetMount = document.getElementById(`citation-mount-frame-${elementId}`);
+            if(!targetMount) return;
+            
+            if(!targetMount.classList.contains('hidden')) {
+                targetMount.classList.add('hidden');
+                return;
+            }
+
+            const docs = await getActiveCourseDocsArray();
+            let primaryTitle = "Academic Data Source Meta Reference";
+            let primaryYear = "2026";
+            let primaryAuthor = "Scholar Network Operations";
+
+            if(docs.length > 0) {
+                primaryTitle = docs[0].metadata.title || docs[0].fileName;
+                primaryAuthor = docs[0].metadata.author || "Scholar, L.";
+                primaryYear = docs[0].metadata.year || "2026";
+            }
+
+            const apaStr = `${primaryAuthor}. (${primaryYear}). _${primaryTitle}_. Retrieved via Lumina AI Cluster Mappings.`;
+            const mlaStr = `"${primaryTitle}." _Lumina Academic Analytics Infrastructure Pool_, edited by ${primaryAuthor}, ${primaryYear}.`;
+            const ieeeStr = `[1] ${primaryAuthor}, "${primaryTitle}," _Lumina Scholar Network Repository Core Engine_, Vol. II, pp. 12-45, ${primaryYear}.`;
+
+            targetMount.innerHTML = `
+                <div class="flex items-center justify-between text-[9px] text-brand-400 font-bold tracking-wider uppercase mb-1">
+                    <span>Generated Reference Citations Configurations</span>
+                    <button class="text-slate-500 hover:text-white" onclick="document.getElementById('citation-mount-frame-${elementId}').classList.add('hidden')"><i data-lucide="x" class="w-3 h-3"></i></button>
+                </div>
+                <div class="space-y-1 text-slate-300">
+                    <p><strong>APA:</strong> ${apaStr}</p>
+                    <p><strong>MLA:</strong> ${mlaStr}</p>
+                    <p><strong>IEEE:</strong> ${ieeeStr}</p>
+                </div>
+                <button class="mt-1.5 w-full bg-space-900 border border-slate-800 hover:border-slate-700 py-1 rounded text-[9px] text-slate-300 font-bold" onclick="navigator.clipboard.writeText(\`${apaStr}\\n${mlaStr}\\n${ieeeStr}\`); createToastAlert('All styles copied.', 'info')">Copy All Citation Formats</button>
+            `;
+            targetMount.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function switchMobileTab(targetTab) {
+            state.activeMobileTab = targetTab;
+            const paneWorkspace = document.getElementById('pane-workspace');
+            const paneNotebook = document.getElementById('pane-notebook');
+            const btnWorkspace = document.getElementById('tab-btn-workspace');
+            const btnNotebook = document.getElementById('tab-btn-notebook');
+
+            if(targetTab === 'workspace') {
+                paneWorkspace.classList.remove('hidden');
+                paneWorkspace.classList.add('flex');
+                paneNotebook.classList.add('hidden');
+                paneNotebook.classList.remove('flex');
+                
+                btnWorkspace.className = "px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-500 text-white transition";
+                btnNotebook.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-400 transition";
+            } else {
+                paneNotebook.classList.remove('hidden');
+                paneNotebook.classList.add('flex');
+                paneWorkspace.classList.add('hidden');
+                paneWorkspace.classList.remove('flex');
+                
+                btnNotebook.className = "px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-500 text-white transition";
+                btnWorkspace.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-400 transition";
+            }
+        }
+
+        function showWizardInteractiveConsole() {
+            const consoleBox = document.getElementById('runtime-wizard-interactive-zone');
+            consoleBox.classList.remove('hidden');
+        }
+
+        function hideWizardInteractiveConsole() {
+            const consoleBox = document.getElementById('runtime-wizard-interactive-zone');
+            consoleBox.innerHTML = "";
+            consoleBox.classList.add('hidden');
+        }
+
+        /* REFACTORED FOR GOOGLE GEMINI V1 SPECIFICATIONS - ELIMINATES 400 BAD REQUEST */
+        async function fetchGeminiIntelligenceEnginePayload(pdfContext, messageText) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${state.apiKey}`;
+            
+            // Build system instructions and reference payload inline seamlessly into a singular flat string chunk to maintain strict v1 validation
+            const dynamicCompiledPrompt = `${ACADEMIC_SYSTEM_PROMPT}\n\n` + 
+                (pdfContext ? `[AGGREGATED DOCUMENT CONTENT EXTRAPOLATION]:\n${pdfContext}\n\n` : "") + 
+                `[USER REQUEST INQUIRY]: ${messageText}`;
+
+            const requestEnvelopePayload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { 
+                                text: dynamicCompiledPrompt 
+                            }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    temperature: 0.1, 
+                    maxOutputTokens: 2500
+                }
+            };
+
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestEnvelopePayload)
+            });
+
+            if(!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error?.message || `HTTP Execution crash error state: ${response.status}`);
+            }
+
+            const parsedJsonData = await response.json();
+            
+            if(!parsedJsonData.candidates || !parsedJsonData.candidates[0] || !parsedJsonData.candidates[0].content) {
+                throw new Error("Malformatted content token matrix returned back from data channel pipelines.");
+            }
+
+            return parsedJsonData.candidates[0].content.parts[0].text;
+        }
+
+        async function handleQueryFormSubmission(event) {
+            event.preventDefault();
+            const inputField = document.getElementById('workspace-user-input');
+            const queryText = inputField.value.trim();
+            if(!queryText) return;
+
+            appendChatBubbleUI('user', queryText);
+            inputField.value = "";
+            
+            const typingIndicator = document.getElementById('stream-typing-wait-indicator');
+            document.getElementById('wait-indicator-text').textContent = "Lumina Scholar calculating structural logical inferences...";
+            typingIndicator.classList.remove('hidden');
+            
+            const scroller = document.getElementById('chat-scroller-stream');
+            scroller.scrollTop = scroller.scrollHeight;
+
+            try {
+                const contextPoolString = await getMergedCourseContextString();
+                const chats = await getAllRecordsFromStore("chats");
+                let activeChatRecord = chats.find(c => c.id === state.currentCourseId) || { id: state.currentCourseId, history: [] };
+                
+                // Invoke refactored runtime handler pass arrays safely
+                const aiResponseResultText = await fetchGeminiIntelligenceEnginePayload(contextPoolString, queryText);
+                
+                typingIndicator.classList.add('hidden');
+                appendChatBubbleUI('scholar', aiResponseResultText);
+
+                activeChatRecord.history.push({ role: "user", parts: [{ text: queryText }] });
+                activeChatRecord.history.push({ role: "model", parts: [{ text: aiResponseResultText }] });
+                await writeDataToStore("chats", activeChatRecord);
+
+            } catch (err) {
+                console.error(err);
+                typingIndicator.classList.add('hidden');
+                createToastAlert(`Transaction processing execution crash fault: ${err.message}`, "error");
+            }
+        }
+
+        async function triggerQuizGeneration() {
+            const indicator = document.getElementById('stream-typing-wait-indicator');
+            document.getElementById('wait-indicator-text').textContent = "Assembling multi-choice evaluation items via Gemini Flash parameters...";
+            indicator.classList.remove('hidden');
+            showWizardInteractiveConsole();
+            
+            const interactiveConsoleZone = document.getElementById('runtime-wizard-interactive-zone');
+            interactiveConsoleZone.innerHTML = `<div class="text-xs text-slate-400 p-4 text-center flex flex-col items-center justify-center gap-2"><div class="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div><span>Compiling academic check vectors...</span></div>`;
+
+            try {
+                const textPool = await getMergedCourseContextString();
+                const quizCommandText = `Generate exactly 3 academic multiple choice questions based on the text. Format your response strictly as a valid raw JSON array, without any markdown code block wrapping indicators (\`\`\`json or \`\`\`), backticks, or extra commentary trailing elements. Structure: [{"question": "string", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "string"}]`;
+
+                const rawJsonStringResponse = await fetchGeminiIntelligenceEnginePayload(textPool, quizCommandText);
+                let cleanJsonString = rawJsonStringResponse.trim();
+                if(cleanJsonString.startsWith("```")) {
+                    cleanJsonString = cleanJsonString.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "");
+                }
+                cleanJsonString = cleanJsonString.trim();
+
+                const parsedQuestionsSet = JSON.parse(cleanJsonString);
+                renderInteractiveQuizUIBlock(parsedQuestionsSet);
+
+            } catch (err) {
+                console.error(err);
+                createToastAlert("Failed to safely extract structured quiz items. Try regenerating.", "error");
+                hideWizardInteractiveConsole();
+            } finally {
+                indicator.classList.add('hidden');
+            }
+        }
+
+        function renderInteractiveQuizUIBlock(questionsArray) {
+            const consoleBox = document.getElementById('runtime-wizard-interactive-zone');
+            consoleBox.innerHTML = `
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5"><i data-lucide="help-circle" class="w-4 h-4"></i> Interactive Verification Quiz Module</span>
+                    <button onclick="hideWizardInteractiveConsole()" class="text-slate-500 hover:text-slate-300"><i data-lucide="x-circle" class="w-4 h-4"></i></button>
+                </div>
+                <div class="space-y-4" id="quiz-items-wrapper"></div>
+            `;
+            
+            const targetContainer = document.getElementById('quiz-items-wrapper');
+            
+            questionsArray.forEach((item, index) => {
+                const questionBlock = document.createElement('div');
+                questionBlock.className = "p-3 bg-space-950/60 border border-slate-800 rounded-xl space-y-2 text-xs";
+                
+                let optionButtonsHtml = "";
+                item.options.forEach((opt, optIdx) => {
+                    optionButtonsHtml += `
+                        <button onclick="evaluateUserQuizAnswerOptionSelection(this, ${optIdx}, ${item.correctIndex}, '${btoa(encodeURIComponent(item.explanation))}')" class="w-full text-left p-2 rounded-lg bg-space-900 border border-slate-800 hover:border-slate-700 text-slate-300 transition text-[11px]">
+                            ${opt}
+                        </button>
+                    `;
+                });
+
+                questionBlock.innerHTML = `
+                    <p class="font-semibold text-slate-200">${index + 1}. ${item.question}</p>
+                    <div class="grid grid-cols-1 gap-1.5 pt-1">${optionButtonsHtml}</div>
+                    <div class="hidden mt-2 p-2 rounded bg-brand-500/10 border border-brand-500/20 text-slate-300 text-[10px] leading-relaxed feedback-explanation-container"></div>
+                `;
+                targetContainer.appendChild(questionBlock);
+            });
+            showWizardInteractiveConsole();
+            lucide.createIcons();
+        }
+
+        function evaluateUserQuizAnswerOptionSelection(buttonElement, chosenIdx, correctIdx, base64ExplanationText) {
+            const parentBlock = buttonElement.parentElement;
+            const explanationBox = parentBlock.nextElementSibling;
+            const siblings = parentBlock.querySelectorAll('button');
+            
+            siblings.forEach(btn => btn.setAttribute('disabled', 'true'));
+            
+            if(chosenIdx === correctIdx) {
+                buttonElement.className = "w-full text-left p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-medium";
+            } else {
+                buttonElement.className = "w-full text-left p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[11px] font-medium";
+                siblings[correctIdx].className = "w-full text-left p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-medium";
+            }
+
+            explanationBox.innerHTML = `<strong>Feedback Analysis Matrix:</strong> ${decodeURIComponent(atob(base64ExplanationText))}`;
+            explanationBox.classList.remove('hidden');
+        }
+
+        async function triggerFlashcardGeneration() {
+            const indicator = document.getElementById('stream-typing-wait-indicator');
+            document.getElementById('wait-indicator-text').textContent = "Assembling flashcards parameters via Gemini Flash...";
+            indicator.classList.remove('hidden');
+            showWizardInteractiveConsole();
+            
+            const interactiveConsoleZone = document.getElementById('runtime-wizard-interactive-zone');
+            interactiveConsoleZone.innerHTML = `<div class="text-xs text-slate-400 p-4 text-center flex flex-col items-center justify-center gap-2"><div class="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div><span>Formulating conceptual key frameworks...</span></div>`;
+
+            try {
+                const textPool = await getMergedCourseContextString();
+                const cardsCommandText = `Compile 3 core review flashcard items based on the text. Format your response strictly as a raw JSON array structure without any markdown wrappers (\`\`\`json or backticks) or outer trailing comments. Schema blueprint: [{"front": "Question/Term", "back": "Definition/Answer"}]`;
+
+                const rawJsonStringResponse = await fetchGeminiIntelligenceEnginePayload(textPool, cardsCommandText);
+                let cleanJsonString = rawJsonStringResponse.trim();
+                if(cleanJsonString.startsWith("```")) {
+                    cleanJsonString = cleanJsonString.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "");
+                }
+                cleanJsonString = cleanJsonString.trim();
+
+                const parsedCardsSet = JSON.parse(cleanJsonString);
+                renderInteractiveFlashcardsUIBlock(parsedCardsSet);
+
+            } catch (err) {
+                console.error(err);
+                createToastAlert("Failed to assemble flashcard definitions arrays safely.", "error");
+                hideWizardInteractiveConsole();
+            } finally {
+                indicator.classList.add('hidden');
+            }
+        }
+
+        function renderInteractiveFlashcardsUIBlock(cardsArray) {
+            const consoleBox = document.getElementById('runtime-wizard-interactive-zone');
+            consoleBox.innerHTML = `
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <span class="text-xs font-bold text-violet-400 flex items-center gap-1.5"><i data-lucide="copyleft" class="w-4 h-4"></i> Interactive Review Flashcards (Click Card Matrix To Flip)</span>
+                    <button onclick="hideWizardInteractiveConsole()" class="text-slate-500 hover:text-slate-300"><i data-lucide="x-circle" class="w-4 h-4"></i></button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="flashcards-deck-wrapper"></div>
+            `;
+
+            const wrapper = document.getElementById('flashcards-deck-wrapper');
+
+            cardsArray.forEach(card => {
+                const flashcardFrameNode = document.createElement('div');
+                flashcardFrameNode.className = "flashcard h-32 cursor-pointer w-full";
+                flashcardFrameNode.setAttribute('onclick', "this.classList.toggle('flipped')");
+                
+                flashcardFrameNode.innerHTML = `
+                    <div class="flashcard-inner relative w-full h-full text-center transition-transform duration-300 transform rounded-xl border border-slate-800 bg-space-950/80">
+                        <div class="absolute inset-0 p-3 flex flex-col items-center justify-center backface-hidden rounded-xl bg-space-950">
+                            <span class="text-[9px] text-violet-400 font-bold uppercase tracking-wider mb-1">Concept Matrix Question</span>
+                            <p class="text-[11px] font-semibold text-slate-200 line-clamp-3">${card.front}</p>
+                        </div>
+                        <div class="absolute inset-0 p-3 flex flex-col items-center justify-center backface-hidden rotate-y-180 rounded-xl bg-slate-900 border border-brand-500/30 overflow-y-auto">
+                            <span class="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Extrapolated Definition</span>
+                            <p class="text-[10px] text-slate-300 leading-normal">${card.back}</p>
+                        </div>
+                    </div>
+                `;
+                wrapper.appendChild(flashcardFrameNode);
+            });
+            showWizardInteractiveConsole();
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
